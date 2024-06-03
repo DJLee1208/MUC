@@ -221,3 +221,108 @@ class ParallelLinear(nn.Module):
         # weight shape: (channels, input_dim, output_dim)
         # output shape: (batch, channels, output_dim)
         return torch.einsum('bci,cio->bco', x, self.weight) + self.bias.unsqueeze(0)
+
+#####################################################
+# MUC Backbone example                              #
+#####################################################
+from abc import ABC, abstractmethod
+
+class NASCell(nn.Module, ABC):
+    @abstractmethod
+    def MACs(self) -> int:
+        """Return the number of Multiply-Accumulate operations."""
+
+
+class Conv1DEmbed(NASCell):
+    def __init__(self, window_size: int, embed_dim: int, channels: int):
+        super(Conv1DEmbed, self).__init__()
+        self.window_size = window_size
+        self.embed_dim = embed_dim
+        self.channels = channels
+        
+        self.conv = nn.Conv1d(1, embed_dim, 3, padding=1)
+        self.act = nn.GELU()
+    
+    def forward(self, x):
+        B,T,C = x.shape
+        x = x.permute(0, 2, 1) # B,C,T
+        x = self.act(self.conv(x.reshape(-1,1,T))) # B*C, Embed, T
+        x = x.mean(dim=-1) # B*C, Embed
+        x = x.reshape(B,C,-1) # B,C,Embed
+        return x
+    
+    @property
+    def MACs(self) -> int:
+        return (self.window_size -2) * self.embed_dim * self.channels
+
+class MLPEmbed(NASCell):
+    def __init__(self, window_size: int, embed_dim: int, channels: int):
+        super(MLPEmbed, self).__init__()
+        self.window_size = window_size
+        self.embed_dim = embed_dim
+        self.channels = channels
+        
+        self.mlp = nn.Linear(window_size, embed_dim)
+        self.act = nn.GELU()
+    
+    def forward(self, x):
+        x = x.permute(0, 2, 1) # B,C,T
+        x = self.act(self.mlp(x)) # B,C,Embed
+        return x
+    
+    @property
+    def MACs(self) -> int:
+        return self.window_size * self.embed_dim * self.channels
+    
+
+
+class NASGradientSearchEmbedding(nn.Module):
+    def __init__(self, window_size: int, embed_dim: int, channels: int):
+        super(NASGradientSearchEmbedding, self).__init__()
+        # TODO: Modify the cells to be searched
+        self.cells: list[NASCell] =[Conv1DEmbed(embed_dim), MLPEmbed(window_size, embed_dim)]
+        self.weights = nn.Parameter(torch.randn(len(self.cells)))
+        
+    def forward(self, x):
+        x = [cell(x) for cell in self.cells]
+        x = torch.stack(x, dim=0) # Cell, B, C, Embed
+        weight = self.weights.softmax(dim=0).view(-1,1,1,1) # Cell, 1, 1, 1
+        x = (x * weight).sum(dim=0) # B, C, Embed
+        return x
+    
+    
+    def MACs(self) -> torch.Tensor:
+        cell_MACs = torch.tensor([cell.MACs() for cell in self.cells])
+        MACs = (cell_MACs * self.weights.softmax(dim=0)).sum()
+        return MACs
+    
+    def LASSO(self) -> torch.Tensor:
+        return self.weights.abs().sum()
+        
+
+#############################
+# MUC Backbone example      #
+#############################
+if __name__ == 'main':
+    from torch.optim import Adam
+    B, Window, Chan, Embed = 32, 96, 10, 512
+    embedding_layer = NASGradientSearchEmbedding(Window, Embed, Chan)
+    model = nn.Linear(Embed, 1) # Dummy model
+    optim = Adam([
+        {'params': model.parameters()},
+        {'params': embedding_layer.parameters(), 'lr': 1e-3},
+    ])
+    
+    data = torch.randn(B, Chan, Window)
+    y_hat = torch.randn(B, 1)
+    
+    embedding = embedding_layer(data)
+    y = model(embedding)
+    loss = F.mse_loss(y, y_hat)
+    
+    hparam = {'MACs_weight': 1e-3, 'LASSO_weight': 1e-3}
+    loss = loss + hparam['MACs_weight'] * embedding_layer.MACs() + hparam['LASSO_weight'] * embedding_layer.LASSO()
+    
+    optim.zero_grad(set_to_none=True)
+    loss.backward()
+    optim.step()
