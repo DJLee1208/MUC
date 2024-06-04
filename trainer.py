@@ -187,7 +187,10 @@ class Trainer:
             else:
                 pred = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)
             
-            loss = F.mse_loss(pred, ground_truth) 
+            ############################    MUC    ############################
+            loss = F.mse_loss(pred, ground_truth) + self.cfg.TRAIN.MACs_weight * self.model.MACs() + self.TRAIN.LASSO_weight * self.model.LASSO()
+            ############################    MUC    ############################
+        
             metric = F.l1_loss(pred, ground_truth)
             
             loss.backward()

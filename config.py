@@ -48,6 +48,10 @@ _C.TRAIN.EVAL_PERIOD = 1 # epoch period to evaluate on a validation set
 _C.TRAIN.PRINT_FREQ  = 1 # iteration frequency to print progress meter
 _C.TRAIN.BEST_METRIC_INITIAL = float("inf") # MSE 나 MAE로 재는데 best model tracking 하기 위한거라서 초기값은 무한대로
 _C.TRAIN.BEST_LOWER = True # best metric이 낮을수록 좋은지 높을수록 좋은지
+############################    MUC    ############################
+_C.TRAIN.MACs_weight = 1e-3
+_C.TRAIN.LASSO_weight = 1e-3
+############################    MUC    ############################
 
 _C.VAL = CN()
 _C.VAL.SPLIT = 'val'
@@ -72,8 +76,11 @@ _C.TEST.APPLY_MOVING_AVERAGE = False # True로 하면 moving average 적용, 시
 _C.TEST.MOVING_AVERAGE_WINDOW = 100 
 
 
-_C.MODEL_NAME = 'Crossformer' #! 체크
+_C.MODEL_NAME = 'iTransformer_MUC' #! 체크
 _C.MODEL = CN()
+############################    MUC    ############################
+_C.MODEL.embed_depth = 3
+############################    MUC    ############################
 _C.MODEL.task_name = 'long_term_forecast'
 _C.MODEL.seq_len = _C.DATA.SEQ_LEN 
 _C.MODEL.label_len = _C.DATA.LABEL_LEN # iTransformer에서는 필요 없음
@@ -81,17 +88,20 @@ _C.MODEL.pred_len = _C.DATA.PRED_LEN
 _C.MODEL.e_layers = 2
 _C.MODEL.d_layers = 1 # iTransformer에서는 필요 없음
 _C.MODEL.factor = 3 # Prob Attention(probabilistic attention)에서 쓰는데 informer에서 씀
+_C.MODEL.num_kernels = 6 # for Inception
 
 _C.MODEL.enc_in = _C.DATA.N_VAR # classification에서만 쓰임
 _C.MODEL.dec_in = _C.DATA.N_VAR # iTransformer에서는 필요 없음
 _C.MODEL.c_out = _C.DATA.N_VAR # iTransformer에서는 필요 없음
 
 _C.MODEL.d_model = 512 # embedding dimension
-_C.MODEL.d_ff = 512  # feedforward dimension d_model -> d_ff -> d_model
+_C.MODEL.d_ff = 2048  # feedforward dimension d_model -> d_ff -> d_model
+
+_C.MODEL.moving_avg = 25 # window size of moving average 라는데 autoformer에서 쓰는거 같다
 
 _C.MODEL.output_attention = False # whether the attention weights are returned by the forward method of the attention class
 _C.MODEL.dropout = 0.1 # 보통 0.1 많이 쓰는 것 같다
-_C.MODEL.n_heads = 2
+_C.MODEL.n_heads = 8
 _C.MODEL.activation = 'gelu'
 _C.MODEL.METRIC_NAMES = ('MAE',)
 _C.MODEL.LOSS_NAMES = ('MSE',)

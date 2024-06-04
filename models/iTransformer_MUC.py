@@ -5,6 +5,7 @@ from layers.Transformer_EncDec import Encoder, EncoderLayer
 from layers.SelfAttention_Family import FullAttention, AttentionLayer
 from layers.Embed import DataEmbedding_inverted
 import numpy as np
+from layers.MUC_modules import NASGradientSearchEmbedding
 
 
 class Model(nn.Module):
@@ -18,9 +19,15 @@ class Model(nn.Module):
         self.seq_len = configs.seq_len
         self.pred_len = configs.pred_len
         self.output_attention = configs.output_attention
+        
+        ############################    MUC    ############################
         # Embedding
-        self.enc_embedding = DataEmbedding_inverted(configs.seq_len, configs.d_model, configs.embed, configs.freq,
-                                                    configs.dropout)
+        self.enc_embedding = nn.ModuleList()
+        for i in range(configs.embed_depth):
+            self.enc_embedding.append(NASGradientSearchEmbedding(configs))
+        # self.enc_embedding = DataEmbedding_inverted(configs.seq_len, configs.d_model, configs.embed, configs.freq, configs.dropout)
+        ############################    MUC    ############################
+        
         # Encoder
         self.encoder = Encoder(
             [
@@ -63,7 +70,9 @@ class Model(nn.Module):
         x_mark_enc 는 month, day, weekday, hour 정보를 담고 있음. 
         '''
         # Embedding
-        enc_out = self.enc_embedding(x_enc, x_mark_enc) 
+        for i in range(len(self.enc_embedding)):
+            x_enc = self.enc_embedding[i](x_enc)
+        # enc_out = self.enc_embedding(x_enc, x_mark_enc) 
         ############################    MUC    ############################
         
         enc_out, attns = self.encoder(enc_out, attn_mask=None)
@@ -80,3 +89,15 @@ class Model(nn.Module):
             return dec_out[:, -self.pred_len:, :]  # [B, L, D]
         else:
             raise ValueError('Not implemented')
+        
+    ############################    MUC    ############################
+    def MACs(self) -> torch.Tensor:
+        all_MACS = torch.tensor([emb.MACs() for emb in self.enc_embedding])
+        MACs = torch.stack(all_MACS).sum()
+        return MACs
+    
+    def LASSO(self) -> torch.Tensor:
+        all_Lasso = torch.tensor([emb.LASSO() for emb in self.enc_embedding])
+        Lasso = torch.stack(all_Lasso).sum()
+        return Lasso
+    ############################    MUC    ############################
