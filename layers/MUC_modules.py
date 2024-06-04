@@ -137,23 +137,22 @@ class NASCell(nn.Module, ABC):
     def MACs(self) -> int:
         """Return the number of Multiply-Accumulate operations."""
 
-
-class Conv1DEmbed(NASCell): #! 각 channel에 대해 다른 1dconv 인가?
+class Conv1DEmbed(NASCell): #! 모든 channel에 대해  같은 1dConv 인듯
     def __init__(self, configs):
         super(Conv1DEmbed, self).__init__()
         self.window_size = configs.seq_len
         self.embed_dim = configs.d_model
         self.channels = configs.enc_in
-        self.kernel_size = 12 
+        self.kernel_size = 4
         
         self.conv = nn.Conv1d(1, self.embed_dim, self.kernel_size, padding=self.kernel_size//2)
         # self.act = nn.GELU()
         self.dropout = nn.Dropout(p=configs.dropout)
     
     def forward(self, x):
-        B,T,C = x.shape
+        B,T,C = x.shape #(batch, seq_len, num_variables)
         x = x.permute(0, 2, 1) # B,C,T
-        x = self.conv(x.reshape(-1,1,T)) # B*C, Embed, T 
+        x = self.conv(x.reshape(-1,1,T)) # B*C, 1, T -> B*C, Embed, T
         x = x.mean(dim=-1) # B*C, Embed  #! 원래 1d conv 할때 이런식으로 embed dimension 만큼 channel을 늘리고 맨 마지막을 mean 때림..?
         x = x.reshape(B,C,-1) # B,C,Embed
         return self.dropout(x)
