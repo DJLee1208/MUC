@@ -173,10 +173,9 @@ class Trainer:
             pred = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)
         
         pred = pred[:, -self.cfg.DATA.PRED_LEN:, self.cfg.DATA.TARGET_START_IDX:]
-        
-        #! 엥 이거 이렇게 된거면 config 넣어주는거랑 상관없이 이렇게 되지 않나?            
+                   
         ############################    MUC    ############################
-        loss = F.mse_loss(pred, ground_truth) + self.cfg.TRAIN.MACs_weight * self.model.MACs() + self.TRAIN.LASSO_weight * self.model.LASSO()
+        loss = F.mse_loss(pred, ground_truth) + self.cfg.TRAIN.MACs_weight * self.model.MACs() + self.cfg.TRAIN.LASSO_weight * self.model.LASSO()
         ############################    MUC    ############################
         metric = F.l1_loss(pred, ground_truth)
         

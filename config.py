@@ -49,8 +49,8 @@ _C.TRAIN.PRINT_FREQ  = 100 # iteration frequency to print progress meter
 _C.TRAIN.BEST_METRIC_INITIAL = float("inf") # MSE 나 MAE로 재는데 best model tracking 하기 위한거라서 초기값은 무한대로
 _C.TRAIN.BEST_LOWER = True # best metric이 낮을수록 좋은지 높을수록 좋은지
 ############################    MUC    ############################
-_C.TRAIN.MACs_weight = 1e-3  #! 체크
-_C.TRAIN.LASSO_weight = 1e-3 #! 체크
+_C.TRAIN.MACs_weight = 5 * 1e-9  #! 체크 이렇게 줄 수도 있고 loss에 들어가게 아니면 MACs contraint 걸어도 될듯
+_C.TRAIN.LASSO_weight = 5 * 1e-3 #! 체크
 ############################    MUC    ############################
 
 _C.VAL = CN()

@@ -87,12 +87,10 @@ class Model(nn.Module):
         
     ############################    MUC    ############################
     def MACs(self) -> torch.Tensor:
-        all_MACS = torch.tensor([emb.MACs() for emb in self.enc_embedding])
-        MACs = torch.stack(all_MACS).sum()
+        MACs = torch.sum(torch.stack([emb.MACs for emb in self.enc_embedding]))
         return MACs
     
     def LASSO(self) -> torch.Tensor:
-        all_Lasso = torch.tensor([emb.LASSO() for emb in self.enc_embedding])
-        Lasso = torch.stack(all_Lasso).sum()
+        Lasso = torch.sum(torch.stack([emb.LASSO for emb in self.enc_embedding]))
         return Lasso
     ############################    MUC    ############################

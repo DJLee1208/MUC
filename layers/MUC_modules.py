@@ -132,10 +132,8 @@ class EncoderLayer_NAS(nn.Module):
 #####################################################
 # MUC Backbone example                              #
 #####################################################
-class NASCell(nn.Module, ABC):
-    @abstractmethod
-    def MACs(self) -> int:
-        """Return the number of Multiply-Accumulate operations."""
+class NASCell(nn.Module):
+    MACs: int
 
 class Conv1DEmbed(NASCell): #! 모든 channel에 대해  같은 1dConv 인듯
     def __init__(self, configs, first_layer):
@@ -144,10 +142,11 @@ class Conv1DEmbed(NASCell): #! 모든 channel에 대해  같은 1dConv 인듯
         self.embed_dim = configs.d_model
         self.channels = configs.enc_in
         self.kernel_size = 4
-        
+       
         self.conv = nn.Conv1d(1, self.embed_dim, self.kernel_size, padding=self.kernel_size//2)
         # self.act = nn.GELU()
         self.dropout = nn.Dropout(p=configs.dropout)
+        self.MACs = (self.window_size - self.kernel_size + 1) * self.embed_dim * 1 * self.kernel_size * self.channels 
     
     def forward(self, x):
         B,T,C = x.shape        # (batch, input_len, num_variables)
@@ -156,10 +155,6 @@ class Conv1DEmbed(NASCell): #! 모든 channel에 대해  같은 1dConv 인듯
         x = x.mean(dim=-1)     # B*C, Embed  
         x = x.reshape(B,C,-1)  # B,C,Embed
         return self.dropout(x.permute(0, 2, 1)) # B,Embed,C
-    
-    @property
-    def MACs(self) -> int:
-        return (self.window_size - self.kernel_size + 1) * self.embed_dim * 1 * self.kernel_size * self.channels 
     
 
 class MLPEmbed(NASCell): # channel 별로 다른 linear
@@ -172,16 +167,13 @@ class MLPEmbed(NASCell): # channel 별로 다른 linear
         self.linear = ParallelLinear(self.window_size, self.embed_dim, self.channels)
         # self.act = nn.GELU() 
         self.dropout = nn.Dropout(p=configs.dropout)
+        self.MACs = self.window_size * self.embed_dim * self.channels
     
     def forward(self, x): # (batch, seq_len, num_variables)
         x = x.permute(0, 2, 1) # B,C,T
         x = self.linear(x) # B,C,Embed
         return self.dropout(x.permute(0, 2, 1))
-    
-    @property
-    def MACs(self) -> int:
-        return self.window_size * self.embed_dim * self.channels
-    
+
     
 class DataEmbedding_inverted(nn.Module): # 모든 chnnel에서 한 개의 linear
     def __init__(self, configs, first_layer):
@@ -192,6 +184,7 @@ class DataEmbedding_inverted(nn.Module): # 모든 chnnel에서 한 개의 linear
         
         self.value_embedding = nn.Linear(self.window_size, self.embed_dim)
         self.dropout = nn.Dropout(p=configs.dropout)
+        self.MACs = self.window_size * self.embed_dim * self.channels
 
     def forward(self, x): # x.shape = (batch, seq_len, n_var)
         x = x.permute(0, 2, 1) # (batch, n_var, seq_len)
@@ -200,21 +193,14 @@ class DataEmbedding_inverted(nn.Module): # 모든 chnnel에서 한 개의 linear
         # x: [Batch Variate d_model]
         return self.dropout(x.permute(0, 2, 1)) # (batch, d_model, n_var)
     
-    @property
-    def MACs(self) -> int:
-        return self.window_size * self.embed_dim * self.channels
-    
 
 class ResidualEmbed(NASCell):
     def __init__(self, configs, first_layer):
         super(ResidualEmbed, self).__init__()
+        self.MACs = 0
 
     def forward(self, x):
         return x
-    
-    @property
-    def MACs(self) -> int:
-        return 0
 
 
 class LSTMEmbed(NASCell): # 모든 chnnel에서 한 개의 LSTM
@@ -226,6 +212,7 @@ class LSTMEmbed(NASCell): # 모든 chnnel에서 한 개의 LSTM
         
         self.lstm = nn.LSTM(self.window_size, self.embed_dim, batch_first=True)
         self.dropout = nn.Dropout(p=configs.dropout)
+        self.MACs = 4 * (self.embed_dim * self.window_size + self.embed_dim**2 + self.embed_dim) # rough estimation
 
     def forward(self, x): # x.shape = (batch, seq_len, num_variables)
         x = x.permute(0, 2, 1) # (batch, num_variables, seq_len)
@@ -238,11 +225,6 @@ class LSTMEmbed(NASCell): # 모든 chnnel에서 한 개의 LSTM
         embeddings = embeddings.permute(1, 0, 2).reshape(x.size(0), x.size(1), -1) # (batch, n_var, d_model)
 
         return self.dropout(embeddings.permute(0, 2, 1)) # (batch, d_model, n_var)
-    
-    @property
-    def MACs(self) -> int:
-        return 4 * (self.embed_dim * self.window_size + self.embed_dim**2 + self.embed_dim) # rough estimation
-        #TODO torchprofile.profile_macs 로 MACs 구하기 
         
     
 class TemporalAttentionEmbed(NASCell): #! attention만 있는 버젼
@@ -255,7 +237,6 @@ class TemporalAttentionEmbed(NASCell): #! attention만 있는 버젼
         # self.pred_len = configs.pred_len
         padding = stride
         
-        # first = 12 #TODO second 개수 확인하기
         self.token_num = int((configs.seq_len - patch_len) / stride + 2) if first_layer \
             else int((configs.d_model - patch_len) / stride + 2)
         
@@ -277,6 +258,7 @@ class TemporalAttentionEmbed(NASCell): #! attention만 있는 버젼
             else configs.d_model * int((configs.d_model - patch_len) / stride + 2)
         
         self.head = FlattenHead(configs.enc_in, self.head_nf, configs.d_model, head_dropout=configs.dropout) # d_model로 Flatten
+        self.MACs = (3+2+1) * configs.d_model * configs.d_model * self.token_num #TODO 맞나?
         
     def forward(self, x): # x.shape = (batch, seq_len, num_variables)
         x = x.permute(0, 2, 1)
@@ -290,10 +272,6 @@ class TemporalAttentionEmbed(NASCell): #! attention만 있는 버젼
         # Flatten
         dec_out = self.head(enc_out)  # dec_out.shape = (batch, n_vars, d_model)        
         return dec_out.permute(0, 2, 1) # (batch, d_model, n_vars)
-    
-    @property
-    def MACs(self) -> int:
-        return (3+2+1) * self.d_model * self.d_model * self.token_num #TODO 맞나?
     
 
 class NASGradientSearchEmbedding(nn.Module):
@@ -313,11 +291,13 @@ class NASGradientSearchEmbedding(nn.Module):
         x = (x * weight).sum(dim=0) # B, C, Embed
         return x
     
+    @property
     def MACs(self) -> torch.Tensor:
-        cell_MACs = torch.tensor([cell.MACs() for cell in self.cells])
+        cell_MACs = torch.tensor([cell.MACs for cell in self.cells], dtype=int).to(self.weights.device)
         MACs = (cell_MACs * self.weights.softmax(dim=0)).sum()
         return MACs
     
+    @property
     def LASSO(self) -> torch.Tensor:
         return self.weights.abs().sum()
 
