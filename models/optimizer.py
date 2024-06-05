@@ -25,6 +25,12 @@ def get_optimizer(optim_params, cfg):
             lr=cfg.SOLVER.BASE_LR,
             weight_decay=cfg.SOLVER.WEIGHT_DECAY
         )
+    elif cfg.SOLVER.OPTIMIZING_METHOD == 'adamW':
+        return torch.optim.AdamW(
+            optim_params,
+            lr=cfg.SOLVER.BASE_LR,
+            weight_decay=cfg.SOLVER.WEIGHT_DECAY
+        )
     elif cfg.SOLVER.OPTIMIZING_METHOD == 'sam_adam':
         base_optimizer = torch.optim.Adam 
         optimizer = SAM(
@@ -37,6 +43,16 @@ def get_optimizer(optim_params, cfg):
         return optimizer
     elif cfg.SOLVER.OPTIMIZING_METHOD == 'sam_Radam':
         base_optimizer = torch.optim.RAdam 
+        optimizer = SAM(
+            optim_params, base_optimizer, 
+            lr=cfg.SOLVER.BASE_LR, 
+            weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+            rho=0.05,
+            adaptive=False
+        )
+        return optimizer
+    elif cfg.SOLVER.OPTIMIZING_METHOD == 'sam_adamW':
+        base_optimizer = torch.optim.AdamW
         optimizer = SAM(
             optim_params, base_optimizer, 
             lr=cfg.SOLVER.BASE_LR, 

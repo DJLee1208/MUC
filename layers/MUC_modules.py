@@ -116,9 +116,9 @@ class EncoderLayer_NAS(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.activation = F.relu if activation == "relu" else F.gelu
 
-    def forward(self, x, attn_mask=None, tau=None, delta=None):
+    def forward(self, x, attn_mask=None, tau=None, delta=None): 
         #! Pre-Norm으로 바꿈
-        x = self.norm1(x)
+        x = self.norm1(x) # x.shape = (batch*n_vars, patch_num = 12, d_model)
         new_x, attn = self.attention(
             x, x, x,
             attn_mask=attn_mask,
@@ -138,9 +138,9 @@ class NASCell(nn.Module, ABC):
         """Return the number of Multiply-Accumulate operations."""
 
 class Conv1DEmbed(NASCell): #! 모든 channel에 대해  같은 1dConv 인듯
-    def __init__(self, configs):
+    def __init__(self, configs, first_layer):
         super(Conv1DEmbed, self).__init__()
-        self.window_size = configs.seq_len
+        self.window_size = configs.seq_len if first_layer else configs.d_model
         self.embed_dim = configs.d_model
         self.channels = configs.enc_in
         self.kernel_size = 4
@@ -150,12 +150,12 @@ class Conv1DEmbed(NASCell): #! 모든 channel에 대해  같은 1dConv 인듯
         self.dropout = nn.Dropout(p=configs.dropout)
     
     def forward(self, x):
-        B,T,C = x.shape #(batch, seq_len, num_variables)
+        B,T,C = x.shape        # (batch, input_len, num_variables)
         x = x.permute(0, 2, 1) # B,C,T
         x = self.conv(x.reshape(-1,1,T)) # B*C, 1, T -> B*C, Embed, T
-        x = x.mean(dim=-1) # B*C, Embed  #! 원래 1d conv 할때 이런식으로 embed dimension 만큼 channel을 늘리고 맨 마지막을 mean 때림..?
-        x = x.reshape(B,C,-1) # B,C,Embed
-        return self.dropout(x)
+        x = x.mean(dim=-1)     # B*C, Embed  
+        x = x.reshape(B,C,-1)  # B,C,Embed
+        return self.dropout(x.permute(0, 2, 1)) # B,Embed,C
     
     @property
     def MACs(self) -> int:
@@ -163,9 +163,9 @@ class Conv1DEmbed(NASCell): #! 모든 channel에 대해  같은 1dConv 인듯
     
 
 class MLPEmbed(NASCell): # channel 별로 다른 linear
-    def __init__(self, configs):
+    def __init__(self, configs, first_layer):
         super(MLPEmbed, self).__init__()
-        self.window_size = configs.seq_len
+        self.window_size = configs.seq_len if first_layer else configs.d_model
         self.embed_dim = configs.d_model
         self.channels = configs.enc_in
         
@@ -176,7 +176,7 @@ class MLPEmbed(NASCell): # channel 별로 다른 linear
     def forward(self, x): # (batch, seq_len, num_variables)
         x = x.permute(0, 2, 1) # B,C,T
         x = self.linear(x) # B,C,Embed
-        return self.dropout(x)
+        return self.dropout(x.permute(0, 2, 1))
     
     @property
     def MACs(self) -> int:
@@ -184,21 +184,21 @@ class MLPEmbed(NASCell): # channel 별로 다른 linear
     
     
 class DataEmbedding_inverted(nn.Module): # 모든 chnnel에서 한 개의 linear
-    def __init__(self, configs):
+    def __init__(self, configs, first_layer):
         super(DataEmbedding_inverted, self).__init__()
-        self.window_size = configs.seq_len
+        self.window_size = configs.seq_len if first_layer else configs.d_model
         self.embed_dim = configs.d_model
         self.channels = configs.enc_in
         
         self.value_embedding = nn.Linear(self.window_size, self.embed_dim)
         self.dropout = nn.Dropout(p=configs.dropout)
 
-    def forward(self, x): # x.shape = (batch, seq_len, num_variables)
-        x = x.permute(0, 2, 1) # (batch, num_variables, seq_len)
+    def forward(self, x): # x.shape = (batch, seq_len, n_var)
+        x = x.permute(0, 2, 1) # (batch, n_var, seq_len)
         # x: [Batch Variate Time]
         x = self.value_embedding(x)
         # x: [Batch Variate d_model]
-        return self.dropout(x)
+        return self.dropout(x.permute(0, 2, 1)) # (batch, d_model, n_var)
     
     @property
     def MACs(self) -> int:
@@ -206,7 +206,7 @@ class DataEmbedding_inverted(nn.Module): # 모든 chnnel에서 한 개의 linear
     
 
 class ResidualEmbed(NASCell):
-    def __init__(self):
+    def __init__(self, configs, first_layer):
         super(ResidualEmbed, self).__init__()
 
     def forward(self, x):
@@ -218,9 +218,9 @@ class ResidualEmbed(NASCell):
 
 
 class LSTMEmbed(NASCell): # 모든 chnnel에서 한 개의 LSTM
-    def __init__(self, configs):
+    def __init__(self, configs, first_layer):
         super(LSTMEmbed, self).__init__()
-        self.window_size = configs.seq_len
+        self.window_size = configs.seq_len if first_layer else configs.d_model
         self.embed_dim = configs.d_model
         self.channels = configs.enc_in
         
@@ -234,9 +234,10 @@ class LSTMEmbed(NASCell): # 모든 chnnel에서 한 개의 LSTM
         for i in range(x.size(1)):
             _, (h_n, _) = self.lstm(x[:, i:i+1])
             embeddings.append(h_n)
-        embeddings = torch.cat(embeddings, dim=1)
-        
-        return self.dropout(embeddings)
+        embeddings = torch.cat(embeddings, dim=1) # (1, batch*n_var, d_model)
+        embeddings = embeddings.permute(1, 0, 2).reshape(x.size(0), x.size(1), -1) # (batch, n_var, d_model)
+
+        return self.dropout(embeddings.permute(0, 2, 1)) # (batch, d_model, n_var)
     
     @property
     def MACs(self) -> int:
@@ -245,16 +246,21 @@ class LSTMEmbed(NASCell): # 모든 chnnel에서 한 개의 LSTM
         
     
 class TemporalAttentionEmbed(NASCell): #! attention만 있는 버젼
-    def __init__(self, configs):
+    def __init__(self, configs, first_layer):
         super(TemporalAttentionEmbed, self).__init__()
-        self.seq_len = configs.seq_len
-        self.pred_len = configs.pred_len
         patch_len = 16
         stride = 8
-        self.token_num = int((configs.seq_len - patch_len) / stride + 2)
+        
+        self.seq_len = configs.seq_len if first_layer else configs.d_model
+        # self.pred_len = configs.pred_len
+        padding = stride
+        
+        # first = 12 #TODO second 개수 확인하기
+        self.token_num = int((configs.seq_len - patch_len) / stride + 2) if first_layer \
+            else int((configs.d_model - patch_len) / stride + 2)
         
         # patching and embedding
-        self.patch_embedding = PatchEmbedding(configs.d_model, patch_len, stride, configs.dropout)
+        self.patch_embedding = PatchEmbedding(configs.d_model, patch_len, stride, padding, configs.dropout)
 
         # Encoder
         self.encoder = EncoderLayer_NAS(
@@ -267,24 +273,23 @@ class TemporalAttentionEmbed(NASCell): #! attention만 있는 버젼
                     activation=configs.activation
                 ) 
         
-        self.head_nf = configs.d_model * int((configs.seq_len - patch_len) / stride + 2)
+        self.head_nf = configs.d_model * int((configs.seq_len - patch_len) / stride + 2) if first_layer \
+            else configs.d_model * int((configs.d_model - patch_len) / stride + 2)
         
         self.head = FlattenHead(configs.enc_in, self.head_nf, configs.d_model, head_dropout=configs.dropout) # d_model로 Flatten
         
     def forward(self, x): # x.shape = (batch, seq_len, num_variables)
         x = x.permute(0, 2, 1)
-        x, n_vars = self.patch_embedding(x)
+        x, n_vars = self.patch_embedding(x) # x.shape = (batch*n_vars, token_num, d_model)
         
         # Patch Attention
-        enc_out, attns = self.encoder(x)
-        enc_out = torch.reshape(enc_out, (-1, n_vars, enc_out.shape[-2], enc_out.shape[-1]))
-        enc_out = enc_out.permute(0, 1, 3, 2)
+        enc_out, attns = self.encoder(x) # enc_out.shape = (batch*n_vars, token_num, d_model)
+        enc_out = torch.reshape(enc_out, (-1, n_vars, enc_out.shape[-2], enc_out.shape[-1])) # (batch, n_vars, token_num, d_model)
+        enc_out = enc_out.permute(0, 1, 3, 2) # (batch, n_vars, d_model, token_num)
         
         # Flatten
-        dec_out = self.head(enc_out)  # z: [bs x nvars x target_window]
-        dec_out = dec_out.permute(0, 2, 1)
-        
-        return x
+        dec_out = self.head(enc_out)  # dec_out.shape = (batch, n_vars, d_model)        
+        return dec_out.permute(0, 2, 1) # (batch, d_model, n_vars)
     
     @property
     def MACs(self) -> int:
@@ -292,11 +297,13 @@ class TemporalAttentionEmbed(NASCell): #! attention만 있는 버젼
     
 
 class NASGradientSearchEmbedding(nn.Module):
-    def __init__(self, configs):
+    def __init__(self, configs, first_layer):
         super(NASGradientSearchEmbedding, self).__init__()
         # TODO: Modify the cells to be searched
-        self.cells: list[NASCell] = [Conv1DEmbed(configs), DataEmbedding_inverted(configs), MLPEmbed(configs), 
-                                     ResidualEmbed(configs), TemporalAttentionEmbed(configs), LSTMEmbed(configs)]
+        self.cells: list[NASCell] = nn.ModuleList([Conv1DEmbed(configs, first_layer), DataEmbedding_inverted(configs, first_layer), MLPEmbed(configs, first_layer), 
+                                     TemporalAttentionEmbed(configs, first_layer), LSTMEmbed(configs, first_layer)] if first_layer \
+                                         else [Conv1DEmbed(configs, first_layer), DataEmbedding_inverted(configs, first_layer), MLPEmbed(configs, first_layer), 
+                                     ResidualEmbed(configs, first_layer), TemporalAttentionEmbed(configs, first_layer), LSTMEmbed(configs, first_layer)])
         self.weights = nn.Parameter(torch.randn(len(self.cells)))
         
     def forward(self, x):
@@ -329,29 +336,29 @@ class NAS_series_decomp(nn.Module): #TODO 이거 아직 아무데도 안씀
 #############################
 # MUC Backbone example      #
 #############################
-if __name__ == 'main':
-    from torch.optim import Adam
-    B, Window, Chan, Embed = 32, 96, 10, 512
-    embedding_layer = NASGradientSearchEmbedding(Window, Embed, Chan)
-    model = nn.Linear(Embed, 1) # Dummy model
-    optim = Adam([
-        {'params': model.parameters()},
-        {'params': embedding_layer.parameters(), 'lr': 1e-3},
-    ])
+# if __name__ == 'main':
+#     from torch.optim import Adam
+#     B, Window, Chan, Embed = 32, 96, 10, 512
+#     embedding_layer = NASGradientSearchEmbedding(Window, Embed, Chan)
+#     model = nn.Linear(Embed, 1) # Dummy model
+#     optim = Adam([
+#         {'params': model.parameters()},
+#         {'params': embedding_layer.parameters(), 'lr': 1e-3},
+#     ])
     
-    data = torch.randn(B, Chan, Window)
-    y_hat = torch.randn(B, 1)
+#     data = torch.randn(B, Chan, Window)
+#     y_hat = torch.randn(B, 1)
     
-    embedding = embedding_layer(data)
-    y = model(embedding)
+#     embedding = embedding_layer(data)
+#     y = model(embedding)
     
     
-    #TODO 여기 loss 보고 trainer 수정하기
-    loss = F.mse_loss(y, y_hat)
+#     #TODO 여기 loss 보고 trainer 수정하기
+#     loss = F.mse_loss(y, y_hat)
     
-    hparam = {'MACs_weight': 1e-3, 'LASSO_weight': 1e-3}
-    loss = loss + hparam['MACs_weight'] * embedding_layer.MACs() + hparam['LASSO_weight'] * embedding_layer.LASSO()
+#     hparam = {'MACs_weight': 1e-3, 'LASSO_weight': 1e-3}
+#     loss = loss + hparam['MACs_weight'] * embedding_layer.MACs() + hparam['LASSO_weight'] * embedding_layer.LASSO()
     
-    optim.zero_grad(set_to_none=True)
-    loss.backward()
-    optim.step()
+#     optim.zero_grad(set_to_none=True)
+#     loss.backward()
+#     optim.step()

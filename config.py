@@ -12,7 +12,7 @@ _C.LOG_TIME = True
 
 _C.DATA_LOADER = CN()
 # the number of data loading workers per gpu
-_C.DATA_LOADER.NUM_WORKERS = 8
+_C.DATA_LOADER.NUM_WORKERS = 4
 _C.DATA_LOADER.PIN_MEMORY = True
 _C.DATA_LOADER.DROP_LAST = True
 _C.DATA_LOADER.PREFETCH_FACTOR = 2
@@ -38,24 +38,24 @@ _C.DATA.TARGET_START_IDX = 0 # column 날린기준, prediction target이 시작�
 _C.TRAIN = CN()
 _C.TRAIN.ENABLE = True # main.py에서 training 할건지 여부
 _C.TRAIN.SPLIT = 'train'
-_C.TRAIN.BATCH_SIZE = 32 #! 체크
+_C.TRAIN.BATCH_SIZE = 64 #! 체크
 _C.TRAIN.SHUFFLE = True
 _C.TRAIN.DROP_LAST = True  # 전체 dataset 길이가 batch_size로 나누어 떨어지지 않을 때 마지막 batch를 버릴지 여부
 _C.TRAIN.CHECKPOINT_DIR = './checkpoints/' # directory to save checkpoints
 _C.TRAIN.RESUME = '' # path to checkpoint to resume training
 _C.TRAIN.CHECKPOINT_PERIOD = 200 # epoch period to save checkpoints
 _C.TRAIN.EVAL_PERIOD = 1 # epoch period to evaluate on a validation set
-_C.TRAIN.PRINT_FREQ  = 1 # iteration frequency to print progress meter
+_C.TRAIN.PRINT_FREQ  = 100 # iteration frequency to print progress meter
 _C.TRAIN.BEST_METRIC_INITIAL = float("inf") # MSE 나 MAE로 재는데 best model tracking 하기 위한거라서 초기값은 무한대로
 _C.TRAIN.BEST_LOWER = True # best metric이 낮을수록 좋은지 높을수록 좋은지
 ############################    MUC    ############################
-_C.TRAIN.MACs_weight = 1e-3
-_C.TRAIN.LASSO_weight = 1e-3
+_C.TRAIN.MACs_weight = 1e-3  #! 체크
+_C.TRAIN.LASSO_weight = 1e-3 #! 체크
 ############################    MUC    ############################
 
 _C.VAL = CN()
 _C.VAL.SPLIT = 'val'
-_C.VAL.BATCH_SIZE = 32 #! 체크
+_C.VAL.BATCH_SIZE = 64 #! 체크
 _C.VAL.SHUFFLE = False
 _C.VAL.DROP_LAST = False
 _C.VAL.VIS = False
@@ -63,7 +63,7 @@ _C.VAL.VIS = False
 _C.TEST = CN()
 _C.TEST.ENABLE = True # main.py에서 test 할건지 여부
 _C.TEST.SPLIT = 'test'
-_C.TEST.BATCH_SIZE = 32 #!체크
+_C.TEST.BATCH_SIZE = 64 #!체크
 _C.TEST.SHUFFLE = False
 _C.TEST.DROP_LAST = False
 _C.TEST.VIS_ERROR = True # Error 보여줄건지
@@ -95,7 +95,7 @@ _C.MODEL.dec_in = _C.DATA.N_VAR # iTransformer에서는 필요 없음
 _C.MODEL.c_out = _C.DATA.N_VAR # iTransformer에서는 필요 없음
 
 _C.MODEL.d_model = 512 # embedding dimension
-_C.MODEL.d_ff = 2048  # feedforward dimension d_model -> d_ff -> d_model
+_C.MODEL.d_ff = 1024 # 2048 # feedforward dimension d_model -> d_ff -> d_model
 
 _C.MODEL.moving_avg = 25 # window size of moving average 라는데 autoformer에서 쓰는거 같다
 
@@ -114,15 +114,15 @@ _C.MODEL.freq = 'h' # iTransformer에서는 필요 없음
 
 _C.SOLVER = CN()
 _C.SOLVER.START_EPOCH = 0
-_C.SOLVER.MAX_EPOCH = 50
-_C.SOLVER.OPTIMIZING_METHOD = 'Radam'
-_C.SOLVER.WEIGHT_DECAY = 0.0 #1e-4
+_C.SOLVER.MAX_EPOCH = 20
+_C.SOLVER.OPTIMIZING_METHOD = 'adamW'
+_C.SOLVER.BASE_LR = 0.001 # warmup end learning rate
+_C.SOLVER.WEIGHT_DECAY = 0.01 #1e-4
 # _C.SOLVER.LR_POLICY = 'cosine' # 없애면 base_lr로 돌아감
 _C.SOLVER.COSINE_END_LR = 0.0
 _C.SOLVER.COSINE_AFTER_WARMUP = False # warmup 없는 cosine만 하려면 false, warmup 있는 cosine 하려면 true
 _C.SOLVER.WARMUP_EPOCHS = 0 # linear warmup epoch
 _C.SOLVER.WARMUP_START_LR = 0 # warmup start learning rate
-_C.SOLVER.BASE_LR = 1e-4 # warmup end learning rate
 
 # learning rate of last fc layer is scaled by fc_lr_ratio
 # _C.SOLVER.FC_LR_RATIO = 10.0
@@ -142,9 +142,9 @@ _C.SOLVER.BASE_LR = 1e-4 # warmup end learning rate
 # endregion
 
 _C.WANDB = CN()
-_C.WANDB.ENABLE = False # wnadb on/off #! 체크
-_C.WANDB.PROJECT = 'BaseCode'
-_C.WANDB.NAME = 'Weather_Crossformer' #! 체크
+_C.WANDB.ENABLE = True # wnadb on/off #! 체크
+_C.WANDB.PROJECT = 'MUC'
+_C.WANDB.NAME = 'iTransformer_MUC_Weather' #! 체크
 _C.WANDB.JOB_TYPE = 'train' # train or eval
 _C.WANDB.NOTES = '' # a description of this run
 _C.WANDB.DIR = './'

@@ -1,6 +1,6 @@
 import torch
 
-from models import Autoformer, iTransformer, Crossformer
+from models import Autoformer, iTransformer, Crossformer, iTransformer_MUC
 
 def build_model(cfg):
     assert cfg.MODEL_NAME in globals(), f"model {cfg.MODEL_NAME} is not defined"

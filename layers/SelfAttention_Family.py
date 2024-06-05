@@ -54,7 +54,7 @@ class FullAttention(nn.Module):
         self.dropout = nn.Dropout(attention_dropout)
 
     def forward(self, queries, keys, values, attn_mask, tau=None, delta=None):
-        B, L, H, E = queries.shape
+        B, L, H, E = queries.shape # (batch*n_var, token_num, n_heads, d_model/n_heads)
         _, S, _, D = values.shape
         scale = self.scale or 1. / sqrt(E)
 
