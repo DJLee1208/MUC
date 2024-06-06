@@ -88,6 +88,36 @@ def get_epoch_lr(cur_epoch, cfg):
         return cfg.SOLVER.BASE_LR
 
 
+def get_epoch_lr(cur_epoch, cur_iter, data_size, fixed_batch, cfg, finetune=False):
+    """
+    Retrieves the lr for the given epoch (as specified by the lr policy).
+    Args:
+        cfg (config): configs of hyper-parameters of ADAM, includes base
+        learning rate, betas, and weight decay.
+        cur_epoch (float): the number of epoch of the current training stage.
+    """
+
+    solver = cfg.SOLVER
+        
+    if solver.LR_POLICY is not None: 
+        adj_lr = lr_policy.get_lr_at_epoch(cfg, cur_epoch, cur_iter, fixed_batch, data_size, finetune)
+        if finetune and solver.WARM_UP:
+            if cur_iter * fixed_batch < solver.WARM_UP:
+                ratio_ = 0.5 * ((2 * cur_iter * fixed_batch + fixed_batch + 1) / solver.WARM_UP) - (0.5 * (solver.WARM_UP / fixed_batch)) * max(((cur_iter * fixed_batch + fixed_batch) / solver.WARM_UP) - 1, 0) ** 2
+                return [val * ratio_ for val in adj_lr]
+        return adj_lr
+
+    elif finetune and solver.WARM_UP:
+        if cur_iter*fixed_batch < solver.WARM_UP:
+            ratio_ = 0.5*((2*cur_iter*fixed_batch+fixed_batch+1)/solver.WARM_UP)-(0.5*(solver.WARM_UP/fixed_batch))*max(((cur_iter*fixed_batch+fixed_batch)/solver.WARM_UP)-1,0)**2
+            return [val*ratio_ for val in solver.BASE_LR]
+        else:
+            return solver.BASE_LR
+    else:
+        return solver.BASE_LR # List
+
+
+
 def set_lr(optimizer, new_lr):
     """
     Sets the optimizer lr to the specified value.
@@ -97,7 +127,7 @@ def set_lr(optimizer, new_lr):
     """
     for idx, param_group in enumerate(optimizer.param_groups):
         param_group["lr"] = new_lr
-
+        
 
 def get_param_groups(model):
     param_groups = [p for n, p in model.named_parameters() if p.requires_grad]
