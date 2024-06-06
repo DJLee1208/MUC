@@ -61,7 +61,7 @@ def lr_func_decay(cfg, cur_epoch):
             slowfast/config/defaults.py
         cur_epoch (float): the number of epoch of the current training stage.
     """
-    return cfg.SOLVER.BASE_LR * (cfg.SOLVER.LR_DECAY_RATE**(cur_epoch//cfg.SOLVER.LR_DECAY_STEP))
+    return cfg.SOLVER.BASE_LR * (cfg.SOLVER.LR_DECAY_RATE**(int(cur_epoch)//cfg.SOLVER.LR_DECAY_STEP))
 
 def get_lr_func(lr_policy):
     """

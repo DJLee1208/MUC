@@ -50,7 +50,7 @@ _C.TRAIN.BEST_METRIC_INITIAL = float("inf") # MSE 나 MAE로 재는데 best mode
 _C.TRAIN.BEST_LOWER = True # best metric이 낮을수록 좋은지 높을수록 좋은지
 ############################    MUC    ############################
 _C.TRAIN.MACs_weight = 3e-9  #! 체크 이렇게 줄 수도 있고 loss에 들어가게 아니면 MACs contraint 걸어도 될듯
-_C.TRAIN.LASSO_weight = 1e-3 # 좀 줄였어도 될듯 #! 체크
+_C.TRAIN.LASSO_weight = 1e-2 # 좀 줄였어도 될듯 #! 체크
 ############################    MUC    ############################
 
 _C.VAL = CN()
@@ -124,26 +124,13 @@ _C.SOLVER.COSINE_AFTER_WARMUP = False # warmup 없는 cosine만 하려면 false,
 _C.SOLVER.WARMUP_EPOCHS = 0.2 # linear warmup epoch
 _C.SOLVER.WARMUP_START_LR = 0 # warmup start learning rate
 
-_C.SOLVER.LR_DECAY_STEP = [1]
-_C.SOLVER.LR_DECAY_RATE = [0.9]
+_C.SOLVER.LR_DECAY_STEP = 1
+_C.SOLVER.LR_DECAY_RATE = 0.9
 
 
 # learning rate of last fc layer is scaled by fc_lr_ratio
 # _C.SOLVER.FC_LR_RATIO = 10.0
 
-# region adam
-# _C.SOLVER.OPTIMIZING_METHOD = 'adam'
-# _C.SOLVER.WEIGHT_DECAY = 0.0001
-# _C.SOLVER.MOMENTUM = 0.9
-# _C.SOLVER.NESTEROV = True
-# _C.SOLVER.DAMPENING = 0.0
-# _C.SOLVER.LR_POLICY = 'cosine'
-# _C.SOLVER.COSINE_END_LR = 0.0
-# _C.SOLVER.COSINE_AFTER_WARMUP = False # warmup 없는 cosine만 하려면 false, warmup 있는 cosine 하려면 true
-# _C.SOLVER.WARMUP_EPOCHS = 0 # linear warmup epoch
-# _C.SOLVER.WARMUP_START_LR = 0 # warmup start learning rate
-# _C.SOLVER.BASE_LR = 0.0001 # warmup end learning rate
-# endregion
 
 _C.WANDB = CN()
 _C.WANDB.ENABLE = True # wnadb on/off #! 체크
