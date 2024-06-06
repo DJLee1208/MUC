@@ -31,7 +31,7 @@ _C.DATA.TIMEENC = 0 # data에 time stamp가 어떻게 되었냐에 따라 0, 1
 _C.DATA.FREQ = 'h' # h or t. temporal embedding. t는 minute embedding 포함. h는 hour, weekday, day, month embedding (iTransformer에서는 필요없음)
 _C.DATA.SCALE = "standard" # 초기 전처리 normalization 방법 # standard, min-max
 _C.DATA.TRAIN_RATIO = 0.7 # train, val, test 비율, 데이터는 train, val, test 순서대로 자름
-_C.DATA.TEST_RATIO = 0.15 # train, val, test 비율
+_C.DATA.TEST_RATIO = 0.2 # train, val, test 비율
 _C.DATA.DATE_IDX = 0 # raw data에서 date가 있지만 날려야 되니까 날리는 column index 
 _C.DATA.TARGET_START_IDX = 0 # column 날린기준, prediction target이 시작하는 column index (예측하는 변수가 뒤에 몰려있어야 함)
 
@@ -63,7 +63,7 @@ _C.VAL.VIS = False
 _C.TEST = CN()
 _C.TEST.ENABLE = True # main.py에서 test 할건지 여부
 _C.TEST.SPLIT = 'test'
-_C.TEST.BATCH_SIZE = 64 #!체크
+_C.TEST.BATCH_SIZE = 1 #!체크
 _C.TEST.SHUFFLE = False
 _C.TEST.DROP_LAST = False
 _C.TEST.VIS_ERROR = True # Error 보여줄건지
