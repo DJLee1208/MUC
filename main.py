@@ -45,7 +45,7 @@ def main():
         if not cfg.TRAIN.ENABLE:
             cfg.TRAIN.MACs_weight = 0.0
             cfg.TRAIN.LASSO_weight = 0.0
-            cfg.SOLVER.MAX_EPOCH = 3
+            cfg.SOLVER.MAX_EPOCH = 20
             cfg.SOLVER.BASE_LR = 1e-4
             cfg.SOLVER.WARMUP_EPOCHS = 0    
             

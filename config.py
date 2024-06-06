@@ -81,7 +81,7 @@ _C.MODEL.embed_depth = 3
 _C.MODEL.softmax = True #! 체크
 _C.TRAIN.MACs_weight = 3e-9   #! 체크 이렇게 줄 수도 있고 loss에 들어가게 아니면 MACs contraint 걸어도 될듯
 _C.TRAIN.LASSO_weight = 0.0 if _C.MODEL.softmax else 5e-3 
-_C.TEST.TOPK = 2 
+_C.TEST.TOPK = 1
 _C.TEST.CHECKPOINT_DIR = './checkpoints/wandb/run-20240606_054234-mia9ri0d/files/240606-144238/' #! 체크 
 ############################    MUC    ############################
 
@@ -129,7 +129,7 @@ _C.SOLVER.WARMUP_EPOCHS = 0.2 # linear warmup epoch
 _C.SOLVER.WARMUP_START_LR = 0 # warmup start learning rate
 
 _C.SOLVER.LR_DECAY_STEP = 1
-_C.SOLVER.LR_DECAY_RATE = 0.9
+_C.SOLVER.LR_DECAY_RATE = 0.99
 
 
 # learning rate of last fc layer is scaled by fc_lr_ratio
@@ -139,7 +139,7 @@ _C.SOLVER.LR_DECAY_RATE = 0.9
 _C.WANDB = CN()
 _C.WANDB.ENABLE = True # wnadb on/off #! 체크
 _C.WANDB.PROJECT = 'MUC'
-_C.WANDB.NAME = 'iTransformer_MUC_SM_2_64_EnergyData_seed0_FT3' #! 체크
+_C.WANDB.NAME = 'iTransformer_MUC_SM_2_64_EnergyData_seed0_FT20top1' #! 체크
 _C.WANDB.JOB_TYPE = 'eval' # train or eval #! 체크
 _C.WANDB.NOTES = '' # a description of this run
 _C.WANDB.DIR = './'
