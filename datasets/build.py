@@ -326,5 +326,14 @@ def update_cfg_from_dataset(cfg: CN, dataset_name: str):
         cfg.MODEL.enc_in = n_var
         cfg.MODEL.dec_in = n_var
         cfg.MODEL.c_out = n_var
+    elif dataset_name == 'energydata_complete':
+        n_var = 28
+        cfg.DATA.N_VAR = n_var
+        cfg.DATA.FEATURES = 'M'
+        cfg.DATA.TARGET_START_IDX = 0
+        
+        cfg.MODEL.enc_in = n_var
+        cfg.MODEL.dec_in = n_var
+        cfg.MODEL.c_out = n_var
     else:
         raise ValueError("Invalid dataset_name: " + dataset_name)

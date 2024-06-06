@@ -37,8 +37,22 @@ def main():
 
     if cfg.TRAIN.ENABLE:
         trainer.train()
+        
     if cfg.TEST.ENABLE:
         model = trainer.load_best_model()
+        
+    ############################    MUC    ############################
+        if not cfg.TRAIN.ENABLE:
+            cfg.TRAIN.MACs_weight = 0.0
+            cfg.TRAIN.LASSO_weight = 0.0
+            cfg.SOLVER.MAX_EPOCH = 3
+            cfg.SOLVER.BASE_LR = 1e-4
+            cfg.SOLVER.WARMUP_EPOCHS = 0    
+            
+            trainer = build_trainer(cfg, model)
+            trainer.train()
+    ############################    MUC    ############################
+            
         predictor = Predictor(cfg, model)
         predictor.predict()
         if cfg.TEST.VIS_ERROR or cfg.TEST.VIS_DATA:

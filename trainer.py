@@ -4,6 +4,7 @@ from typing import Optional, Tuple, Mapping, Union, List
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import wandb
 from torch.optim import Optimizer
@@ -376,7 +377,11 @@ class Trainer:
             torch.save(checkpoint, f)
 
     def load_best_model(self):
-        model_path = os.path.join(self.cfg.TRAIN.CHECKPOINT_DIR, "checkpoint_best.pth")
+        if self.cfg.TRAIN.ENABLE:
+            model_path = os.path.join(self.cfg.TRAIN.CHECKPOINT_DIR, "checkpoint_best.pth")
+        else:
+            model_path = os.path.join(self.cfg.TEST.CHECKPOINT_DIR, "checkpoint_best.pth")
+            
         if os.path.isfile(model_path):
             print(f"Loading checkpoint from {model_path}")
             checkpoint = torch.load(model_path, map_location="cpu")
@@ -385,6 +390,20 @@ class Trainer:
             msg = self.model.load_state_dict(state_dict, strict=True)
             assert set(msg.missing_keys) == set()
 
+            ############################    MUC    ############################
+            if not self.cfg.TRAIN.ENABLE:
+                topk = self.cfg.TEST.TOPK
+                for i in range(len(self.model.enc_embedding)):
+                    if self.cfg.MODEL.softmax:
+                        top_cells_indices = torch.topk(self.model.enc_embedding[i].weights, topk).indices
+                    else:
+                        top_cells_indices = torch.topk(torch.abs(self.model.enc_embedding[i].weights), topk).indices
+                    
+                    self.model.enc_embedding[i].cells = nn.ModuleList([self.model.enc_embedding[i].cells[j] for j in top_cells_indices])
+                    self.model.enc_embedding[i].weights = nn.Parameter(torch.tensor([self.model.enc_embedding[i].weights[j] for j in top_cells_indices], device=self.model.enc_embedding[i].weights.device))
+                    print(f"Layer {i} top cells: {top_cells_indices}")
+            ############################    MUC    ############################
+            
             print(f"Loaded pre-trained model from {model_path}")
         else:
             print("=> no checkpoint found at '{}'".format(model_path))
