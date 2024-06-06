@@ -64,8 +64,10 @@ class Model(nn.Module):
         x_mark_enc 는 month, day, weekday, hour 정보를 담고 있음. 
         '''
         # Embedding
+        weights = []
         for i in range(len(self.enc_embedding)):
-            x_enc = self.enc_embedding[i](x_enc)
+            x_enc, weight = self.enc_embedding[i](x_enc)
+            weights.append(weight)
         enc_out = x_enc.permute(0, 2, 1)
         # enc_out = self.enc_embedding(x_enc, x_mark_enc)  # enc_out.shape = (batch, n_var+4, d_model)
         ############################    MUC    ############################
@@ -73,15 +75,16 @@ class Model(nn.Module):
         enc_out, attns = self.encoder(enc_out, attn_mask=None) # enc_out.shape = (batch, n_var+4, d_model)
 
         dec_out = self.projection(enc_out).permute(0, 2, 1)[:, :, :N]
+        
         # De-Normalization from Non-stationary Transformer
         dec_out = dec_out * (stdev[:, 0, :].unsqueeze(1).repeat(1, self.pred_len, 1))
         dec_out = dec_out + (means[:, 0, :].unsqueeze(1).repeat(1, self.pred_len, 1))
-        return dec_out
+        return dec_out, weights
 
     def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, mask=None):
         if self.task_name == 'long_term_forecast' or self.task_name == 'short_term_forecast':
-            dec_out = self.forecast(x_enc, x_mark_enc, x_dec, x_mark_dec)
-            return dec_out[:, -self.pred_len:, :]  # [B, L, D]
+            dec_out, weights = self.forecast(x_enc, x_mark_enc, x_dec, x_mark_dec)
+            return dec_out[:, -self.pred_len:, :], weights  # [B, L, D]
         else:
             raise ValueError('Not implemented')
         

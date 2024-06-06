@@ -281,15 +281,20 @@ class NASGradientSearchEmbedding(nn.Module):
         self.cells: list[NASCell] = nn.ModuleList([Conv1DEmbed(configs, first_layer), DataEmbedding_inverted(configs, first_layer), MLPEmbed(configs, first_layer), 
                                      TemporalAttentionEmbed(configs, first_layer), LSTMEmbed(configs, first_layer)] if first_layer \
                                          else [Conv1DEmbed(configs, first_layer), DataEmbedding_inverted(configs, first_layer), MLPEmbed(configs, first_layer), 
-                                     ResidualEmbed(configs, first_layer), TemporalAttentionEmbed(configs, first_layer), LSTMEmbed(configs, first_layer)])
-        self.weights = nn.Parameter(torch.randn(len(self.cells)))
+                                     TemporalAttentionEmbed(configs, first_layer), LSTMEmbed(configs, first_layer), ResidualEmbed(configs, first_layer)])
+        # self.weights = nn.Parameter(torch.randn(len(self.cells)))
+        self.weights = nn.Parameter(torch.ones(len(self.cells)) / len(self.cells))
+        # self.weights = nn.Parameter(torch.zeros(len(self.cells)))
+        # k = 1 / math.sqrt(len(self.cells))
+        # self.weights = nn.Parameter(torch.empty(len(self.cells)).uniform_(-k, k))
         
     def forward(self, x):
         x = [cell(x) for cell in self.cells]
         x = torch.stack(x, dim=0) # Cell, B, C, Embed
-        weight = self.weights.softmax(dim=0).view(-1,1,1,1) # Cell, 1, 1, 1
+        # weight = self.weights.softmax(dim=0).view(-1,1,1,1) # Cell, 1, 1, 1
+        weight = self.weights.view(-1,1,1,1) # Cell, 1, 1, 1
         x = (x * weight).sum(dim=0) # B, C, Embed
-        return x
+        return x, self.weights.tolist()
     
     @property
     def MACs(self) -> torch.Tensor:

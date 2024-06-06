@@ -49,8 +49,8 @@ _C.TRAIN.PRINT_FREQ  = 100 # iteration frequency to print progress meter
 _C.TRAIN.BEST_METRIC_INITIAL = float("inf") # MSE 나 MAE로 재는데 best model tracking 하기 위한거라서 초기값은 무한대로
 _C.TRAIN.BEST_LOWER = True # best metric이 낮을수록 좋은지 높을수록 좋은지
 ############################    MUC    ############################
-_C.TRAIN.MACs_weight = 5 * 1e-9  #! 체크 이렇게 줄 수도 있고 loss에 들어가게 아니면 MACs contraint 걸어도 될듯
-_C.TRAIN.LASSO_weight = 5 * 1e-3 #! 체크
+_C.TRAIN.MACs_weight = 3e-9  #! 체크 이렇게 줄 수도 있고 loss에 들어가게 아니면 MACs contraint 걸어도 될듯
+_C.TRAIN.LASSO_weight = 5e-2 # 좀 줄였어도 될듯 #! 체크
 ############################    MUC    ############################
 
 _C.VAL = CN()
@@ -85,7 +85,7 @@ _C.MODEL.task_name = 'long_term_forecast'
 _C.MODEL.seq_len = _C.DATA.SEQ_LEN 
 _C.MODEL.label_len = _C.DATA.LABEL_LEN # iTransformer에서는 필요 없음
 _C.MODEL.pred_len = _C.DATA.PRED_LEN 
-_C.MODEL.e_layers = 2
+_C.MODEL.e_layers = 3
 _C.MODEL.d_layers = 1 # iTransformer에서는 필요 없음
 _C.MODEL.factor = 3 # Prob Attention(probabilistic attention)에서 쓰는데 informer에서 씀
 _C.MODEL.num_kernels = 6 # for Inception
@@ -114,9 +114,9 @@ _C.MODEL.freq = 'h' # iTransformer에서는 필요 없음
 
 _C.SOLVER = CN()
 _C.SOLVER.START_EPOCH = 0
-_C.SOLVER.MAX_EPOCH = 20
+_C.SOLVER.MAX_EPOCH = 40
 _C.SOLVER.OPTIMIZING_METHOD = 'adamW'
-_C.SOLVER.BASE_LR = 0.001 # warmup end learning rate
+_C.SOLVER.BASE_LR = 5e-4 # warmup end learning rate
 _C.SOLVER.WEIGHT_DECAY = 0.01 #1e-4
 # _C.SOLVER.LR_POLICY = 'cosine' # 없애면 base_lr로 돌아감
 _C.SOLVER.COSINE_END_LR = 0.0

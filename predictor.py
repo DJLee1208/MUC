@@ -129,9 +129,9 @@ class Predictor:
             model_cfg = self.cfg.MODEL
             
             if model_cfg.output_attention:
-                pred = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)[0]
+                pred, weights = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)[0]
             else:
-                pred = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)
+                pred, weights = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)
 
             pred = pred[:, -self.cfg.DATA.PRED_LEN:, self.cfg.DATA.TARGET_START_IDX:]
 

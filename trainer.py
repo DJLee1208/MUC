@@ -118,8 +118,24 @@ class Trainer:
                 f"Train/{metric_meter.name}": metric_meter.val for metric_meter in metric_meters
             })
             log_dict.update({
-                f"Train/{loss_meter.name}": loss_meter.val for loss_meter in loss_meters
+                f"Train/Loss_Total": loss_meter.val for loss_meter in loss_meters
             })
+            ############################    MUC    ############################
+            for i in range(len(outputs['weights'])):    
+                for j in range(len(outputs['weights'][i])):
+                    log_dict.update({
+                        f"Train/Layer_{i}_Weight_{j}": outputs["weights"][i][j]
+                    })
+            log_dict.update({
+                "Train/Loss_MSE": outputs["loss_mse"]
+            })
+            log_dict.update({
+                "Train/Loss_MACs": outputs["loss_MACs"]
+            })
+            log_dict.update({
+                "Train/Loss_LASSO": outputs["loss_LASSO"]
+            })
+            ############################    MUC    ############################
 
             if cur_iter % self.cfg.TRAIN.PRINT_FREQ == 0:
                 progress.display(cur_iter)
@@ -168,14 +184,17 @@ class Trainer:
         model_cfg = self.cfg.MODEL
        
         if model_cfg.output_attention:
-            pred = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)[0]
+            pred, weights = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)[0]
         else:
-            pred = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)
+            pred, weights = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)
         
         pred = pred[:, -self.cfg.DATA.PRED_LEN:, self.cfg.DATA.TARGET_START_IDX:]
                    
         ############################    MUC    ############################
-        loss = F.mse_loss(pred, ground_truth) + self.cfg.TRAIN.MACs_weight * self.model.MACs() + self.cfg.TRAIN.LASSO_weight * self.model.LASSO()
+        loss_mse = F.mse_loss(pred, ground_truth)
+        loss_MACs = self.cfg.TRAIN.MACs_weight * self.model.MACs()
+        loss_LASSO = self.cfg.TRAIN.LASSO_weight * self.model.LASSO()
+        loss = loss_mse + loss_MACs + loss_LASSO        
         ############################    MUC    ############################
         metric = F.l1_loss(pred, ground_truth)
         
@@ -184,12 +203,15 @@ class Trainer:
             self.optimizer.first_step(zero_grad=True)
             
             if model_cfg.output_attention:
-                pred = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)[0]
+                pred, weights = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)[0]
             else:
-                pred = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)
+                pred, weights = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)
             
             ############################    MUC    ############################
-            loss = F.mse_loss(pred, ground_truth) + self.cfg.TRAIN.MACs_weight * self.model.MACs() + self.TRAIN.LASSO_weight * self.model.LASSO()
+            loss_mse = F.mse_loss(pred, ground_truth)
+            loss_MACs = self.cfg.TRAIN.MACs_weight * self.model.MACs()
+            loss_LASSO = self.cfg.TRAIN.LASSO_weight * self.model.LASSO()
+            loss = loss_mse + loss_MACs + loss_LASSO
             ############################    MUC    ############################
         
             metric = F.l1_loss(pred, ground_truth)
@@ -204,7 +226,13 @@ class Trainer:
         
         outputs = dict(
             losses=(loss,),
-            metrics=(metric,)
+            metrics=(metric,),
+            ############################    MUC    ############################
+            weights = weights,
+            loss_mse = loss_mse,
+            loss_MACs = loss_MACs,
+            loss_LASSO = loss_LASSO
+            ############################    MUC    ############################
         )
 
         return outputs
@@ -298,9 +326,9 @@ class Trainer:
         model_cfg = self.cfg.MODEL
         
         if model_cfg.output_attention:
-            pred = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)[0]
+            pred, weights = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)[0]
         else:
-            pred = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)
+            pred, weights = self.model(enc_window, enc_window_stamp, dec_window, dec_window_stamp)
         
         pred = pred[:, -self.cfg.DATA.PRED_LEN:, self.cfg.DATA.TARGET_START_IDX:]
         
